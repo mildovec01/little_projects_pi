@@ -1,9 +1,25 @@
-from keypad import Keypad
+#!/usr/bin/env python3
+# PIN + LCD1602 (I2C) + Keypad 4x4 + zelená/červená LED + bzučák
+# Piny (BCM):
+# rowsPins = [18, 23, 24, 25]
+# colsPins = [22, 27, 17, 5]
+# LED green=16, LED red=20, buzzer=12
+
 import time
 from gpiozero import LED, Buzzer
 import smbus2
 
-# --- LCD 1602 I2C (PCF8574) mini driver ---
+# --- Bezpečný import třídy Keypad (podporuje "keypad.py" i "Keypad.py") ---
+try:
+    from keypad import Keypad as KeypadClass
+except ImportError:
+    try:
+        from Keypad import Keypad as KeypadClass
+    except ImportError as e:
+        raise SystemExit("Nenalezl jsem modul 'keypad.py' / 'Keypad.py' se třídou Keypad "
+                         "ve stejné složce jako tento skript.") from e
+
+# --- LCD 1602 I2C minimalistický driver (PCF8574 backpack) ---
 class I2cLcd1602:
     LCD_CLEARDISPLAY   = 0x01
     LCD_RETURNHOME     = 0x02
@@ -78,6 +94,18 @@ class I2cLcd1602:
         self.backlight = self.BACKLIGHT if on else 0
         self.bus.write_byte(self.addr, self.backlight)
 
+# --- Autodetekce I2C adresy LCD (0x27 / 0x3f) ---
+def find_lcd_addr(bus=1):
+    dev = smbus2.SMBus(bus)
+    candidates = list(range(0x20, 0x28)) + list(range(0x38, 0x40))
+    for addr in candidates:
+        try:
+            dev.write_byte(addr, 0x00)
+            return addr
+        except OSError:
+            continue
+    return None
+
 # --- Piny / mapy ---
 ROWS = 4
 COLS = 4
@@ -90,13 +118,10 @@ KEYS = [
 rowsPins = [18, 23, 24, 25]
 colsPins = [22, 27, 17, 5]   # finální pořadí, bez GPIO10
 
-# LCD adresa (změň na 0x3f pokud ti i2cdetect ukáže 3f)
-LCD_ADDR = 0x27
-
 # LED + buzzer
 led_green = LED(16)
 led_red   = LED(20)
-buzzer    = Buzzer(12)
+buzzer    = Buzzer(12)   # aktivní buzzer (pasivní = napiš, přepíšu na PWM tón)
 
 # ATM logika
 PIN_KOD = "1234"
@@ -137,12 +162,10 @@ def read_pin(kp, lcd, max_len=PIN_MAX_LEN, timeout=30):
     while True:
         stars = "*" * len(buffer)
         lcd.set_cursor(0, 1); lcd.print((stars + " " * (16 - len(stars)))[:16])
-
         k = wait_key(kp, timeout=timeout)
         if k is None:
             lcd_msg(lcd, "Timeout.", "Zkus znovu")
             return None
-
         if k in "0123456789":
             if len(buffer) < max_len:
                 buffer.append(k)
@@ -155,15 +178,20 @@ def read_pin(kp, lcd, max_len=PIN_MAX_LEN, timeout=30):
             return None
         elif k == 'A':  # Enter
             return "".join(buffer)
-        # ostatní ignoruj
 
 def main():
-    # LCD
-    lcd = I2cLcd1602(i2c_bus=1, i2c_addr=LCD_ADDR, cols=16, rows=2)
+    # LCD autodetekce adresy
+    addr = find_lcd_addr(1)
+    if addr is None:
+        raise SystemExit("LCD nenalezen na I2C. Zkontroluj SDA=GPIO2, SCL=GPIO3, napájení a 'i2cdetect -y 1'.")
+    lcd = I2cLcd1602(i2c_bus=1, i2c_addr=addr, cols=16, rows=2)
     lcd.backlight_on(True)
 
-    # Keypad
-    kp = Keypad.Keypad(KEYS, rowsPins, colsPins, ROWS, COLS)
+    # Keypad instance
+    print("KeypadClass =", KeypadClass)  # debug info
+    kp = KeypadClass(KEYS, rowsPins, colsPins, ROWS, COLS)
+    if kp is None:
+        raise SystemExit("Keypad konstruktor vrátil None. Ujisti se, že ve tvém 'keypad.py' je class Keypad.")
     kp.setDebounceTime(50)
 
     lcd_msg(lcd, "ATM demo", "Ready")
@@ -183,7 +211,7 @@ def main():
             time.sleep(0.8)
             pokusy = 0
 
-            # menu
+            # jednoduché menu
             while True:
                 lcd_msg(lcd, "1:Zustatek", "2:-100 3:+100")
                 key = wait_key(kp, timeout=30)
@@ -204,8 +232,6 @@ def main():
                     lcd_msg(lcd, "Odhlaseni", "Bye"); time.sleep(0.8); break
                 elif key == 'C':
                     lcd_msg(lcd, "Zpet", ""); time.sleep(0.5)
-                # ostatní ignorujeme
-
         else:
             pokusy += 1
             zbyva = MAX_POKUSU - pokusy
