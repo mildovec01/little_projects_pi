@@ -78,9 +78,6 @@ class I2cLcd1602:
         self.backlight = self.BACKLIGHT if on else 0
         self.bus.write_byte(self.addr, self.backlight)
 
-# --- Keypad import ---
-import Keypad  # musí být ve stejné složce jako tento skript
-
 # --- Piny / mapy ---
 ROWS = 4
 COLS = 4
