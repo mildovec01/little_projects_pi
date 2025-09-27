@@ -2,10 +2,10 @@ from gpiozero import Buzzer, LED
 import time
 
 # Set pins to BCM numbering
-led1 = LED(11)
-led2 = LED(12)
-led3 = LED(13)
-buzzer = Buzzer(18)
+led1 = LED(17) # --> Real PIN 11
+led2 = LED(18) # --> Real PIN 12
+led3 = LED(27) # --> Real PIN 13
+buzzer = Buzzer(24) # --> Real PIN 18
 
 # First LED that shows ==> S
 def first_led(led1):
