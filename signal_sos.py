@@ -1,10 +1,10 @@
 from gpiozero import Buzzer, LED
 import time
 
-led1 = LED(11)
-led2 = LED(12)
-led3 = LED(13)
-buzzer = Buzzer(18)
+led1 = LED(17)
+led2 = LED(18)
+led3 = LED(27)
+buzzer = Buzzer(24)
 
 def first_led(led1):
     for i in range(3):
