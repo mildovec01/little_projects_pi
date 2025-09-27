@@ -201,6 +201,13 @@ def main():
     balance = 1000
 
     while True:
+        lcd_msg(lcd, "Key test 10s", "Stiskej klavesy")
+        t0 = time.time()
+        while time.time() - t0 < 10:
+            k = wait_key(kp, timeout=1)
+            if k:
+                lcd_msg(lcd, "Key:", str(k))
+                time.sleep(0.3)
         pin = read_pin(kp, lcd)
         if pin is None:
             continue
