@@ -1,4 +1,4 @@
-from .keypad import Keypad
+from keypad import Keypad
 import time
 
 # --- MAPPING  ---
