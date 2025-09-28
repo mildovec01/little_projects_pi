@@ -4,8 +4,6 @@
 # colsPins = [22, 27, 17, 5]
 # LED green=16, LED red=20, buzzer=12
 
-
-
 import time
 from gpiozero import LED, Buzzer
 import smbus2
