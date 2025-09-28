@@ -17,8 +17,8 @@ except ImportError:
     try:
         from Keypad import Keypad as KeypadClass
     except ImportError as e:
-        raise SystemExit("Nenalezl jsem modul 'keypad.py' / 'Keypad.py' se třídou Keypad "
-                         "ve stejné složce jako tento skript.") from e
+        raise SystemExit("Couldnt find 'keypad.py' with class Keypad "
+                         "in the same folder as the script.") from e
 
 # LCD1602 i2c driver
 class I2cLcd1602:
