@@ -1,15 +1,16 @@
-#!/usr/bin/env python3
-# PIN + LCD1602 (I2C) + Keypad 4x4 + zelená/červená LED + bzučák
-# Piny (BCM):
+# LCD1602 (I2C) + green led and red led + buzzer + matrix keypad
+# Pins (BCM):
 # rowsPins = [18, 23, 24, 25]
 # colsPins = [22, 27, 17, 5]
 # LED green=16, LED red=20, buzzer=12
+
+
 
 import time
 from gpiozero import LED, Buzzer
 import smbus2
 
-# --- Bezpečný import třídy Keypad (podporuje "keypad.py" i "Keypad.py") ---
+# Safe import
 try:
     from keypad import Keypad as KeypadClass
 except ImportError:
@@ -19,7 +20,7 @@ except ImportError:
         raise SystemExit("Nenalezl jsem modul 'keypad.py' / 'Keypad.py' se třídou Keypad "
                          "ve stejné složce jako tento skript.") from e
 
-# --- LCD 1602 I2C minimalistický driver (PCF8574 backpack) ---
+# LCD1602 i2c driver
 class I2cLcd1602:
     LCD_CLEARDISPLAY   = 0x01
     LCD_RETURNHOME     = 0x02
@@ -94,7 +95,7 @@ class I2cLcd1602:
         self.backlight = self.BACKLIGHT if on else 0
         self.bus.write_byte(self.addr, self.backlight)
 
-# --- Autodetekce I2C adresy LCD (0x27 / 0x3f) ---
+# Finding the LCD
 def find_lcd_addr(bus=1):
     dev = smbus2.SMBus(bus)
     candidates = list(range(0x20, 0x28)) + list(range(0x38, 0x40))
@@ -106,7 +107,7 @@ def find_lcd_addr(bus=1):
             continue
     return None
 
-# --- Piny / mapy ---
+# PINs and map
 ROWS = 4
 COLS = 4
 KEYS = [
@@ -116,14 +117,14 @@ KEYS = [
     '*','0','#','D'
 ]
 rowsPins = [18, 23, 24, 25]
-colsPins = [22, 27, 17, 5]   # finální pořadí, bez GPIO10
+colsPins = [22, 27, 17, 5]   
 
 # LED + buzzer
 led_green = LED(16)
 led_red   = LED(20)
-buzzer    = Buzzer(12)   # aktivní buzzer (pasivní = napiš, přepíšu na PWM tón)
+buzzer    = Buzzer(12)   # active buzzer (passive buzzer needs PWM)
 
-# ATM logika
+# ATM logic
 PIN_KOD = "1234"
 PIN_MAX_LEN = 6
 MAX_POKUSU = 3
@@ -158,13 +159,13 @@ def wait_key(kp, timeout=None):
 
 def read_pin(kp, lcd, max_len=PIN_MAX_LEN, timeout=30):
     buffer = []
-    lcd_msg(lcd, "Zadej PIN:", "")
+    lcd_msg(lcd, "Enter PIN:", "")
     while True:
         stars = "*" * len(buffer)
         lcd.set_cursor(0, 1); lcd.print((stars + " " * (16 - len(stars)))[:16])
         k = wait_key(kp, timeout=timeout)
         if k is None:
-            lcd_msg(lcd, "Timeout.", "Zkus znovu")
+            lcd_msg(lcd, "Timeout.", "Try again")
             return None
         if k in "0123456789":
             if len(buffer) < max_len:
@@ -173,17 +174,17 @@ def read_pin(kp, lcd, max_len=PIN_MAX_LEN, timeout=30):
             buffer.pop()
         elif k == '*':
             buffer = []
-        elif k == 'C':
-            lcd_msg(lcd, "Zruseno", "")
+        elif k == 'C': #Cancel
+            lcd_msg(lcd, "Cancelled", "")
             return None
         elif k == 'A':  # Enter
             return "".join(buffer)
 
 def main():
-    # LCD autodetekce adresy
+    # LCD autodetection
     addr = find_lcd_addr(1)
     if addr is None:
-        raise SystemExit("LCD nenalezen na I2C. Zkontroluj SDA=GPIO2, SCL=GPIO3, napájení a 'i2cdetect -y 1'.")
+        raise SystemExit("LCD wasnt found at I2C. Control SDA=GPIO2, SCL=GPIO3, connection a 'i2cdetect -y 1'.")
     lcd = I2cLcd1602(i2c_bus=1, i2c_addr=addr, cols=16, rows=2)
     lcd.backlight_on(True)
 
@@ -191,7 +192,7 @@ def main():
     print("KeypadClass =", KeypadClass)  # debug info
     kp = KeypadClass(KEYS, rowsPins, colsPins, ROWS, COLS)
     if kp is None:
-        raise SystemExit("Keypad konstruktor vrátil None. Ujisti se, že ve tvém 'keypad.py' je class Keypad.")
+        raise SystemExit("Keypad constructor returned None. Make sure, that in 'keypad.py' is class Keypad.")
     kp.setDebounceTime(50)
 
     lcd_msg(lcd, "ATM demo", "Ready")
@@ -207,47 +208,47 @@ def main():
 
         if pin == PIN_KOD:
             beep_short(); led_success()
-            lcd_msg(lcd, "PIN OK", "Vitej!")
+            lcd_msg(lcd, "PIN OK", "Welcome!")
             time.sleep(0.8)
             pokusy = 0
 
-            # jednoduché menu
+            # Easy menu
             while True:
-                lcd_msg(lcd, "1:Zustatek", "2:-100 3:+100")
+                lcd_msg(lcd, "1:Balance", "2:-100 3:+100")
                 key = wait_key(kp, timeout=30)
                 if key is None:
-                    lcd_msg(lcd, "Timeout", "Odhlaseni"); time.sleep(0.8); break
+                    lcd_msg(lcd, "Timeout", "Log out"); time.sleep(0.8); break
                 if key == '1':
-                    lcd_msg(lcd, "Zustatek:", f"{balance} Kc"); time.sleep(1.3)
+                    lcd_msg(lcd, "Balance:", f"{balance} Kc"); time.sleep(1.3)
                 elif key == '2':
                     if balance >= 100:
                         balance -= 100
-                        lcd_msg(lcd, "Vybrano", "100 Kc"); beep_short(); time.sleep(1.0)
+                        lcd_msg(lcd, "Withdrawed", "100 Kc"); beep_short(); time.sleep(1.0)
                     else:
-                        lcd_msg(lcd, "Nedostatek", "prostredku"); beep_long(); led_fail(); time.sleep(1.2)
+                        lcd_msg(lcd, "Not enough", "balance"); beep_long(); led_fail(); time.sleep(1.2)
                 elif key == '3':
                     balance += 100
-                    lcd_msg(lcd, "Vlozeno", "100 Kc"); beep_short(); time.sleep(1.0)
+                    lcd_msg(lcd, "Deposited", "100 Kc"); beep_short(); time.sleep(1.0)
                 elif key == 'D':
-                    lcd_msg(lcd, "Odhlaseni", "Bye"); time.sleep(0.8); break
+                    lcd_msg(lcd, "Logged out", "Bye"); time.sleep(0.8); break
                 elif key == 'C':
-                    lcd_msg(lcd, "Zpet", ""); time.sleep(0.5)
+                    lcd_msg(lcd, "Back", ""); time.sleep(0.5)
         else:
             pokusy += 1
             zbyva = MAX_POKUSU - pokusy
-            lcd_msg(lcd, "Spatny PIN", f"Pokusy zbyva:{max(0,zbyva)}")
+            lcd_msg(lcd, "Wrong PIN", f"Remaining tries:{max(0,zbyva)}")
             beep_long(); led_fail()
             time.sleep(0.9)
 
             if pokusy >= MAX_POKUSU:
-                lcd_msg(lcd, "Zablokovano", f"{LOCKOUT_S}s cekej")
+                lcd_msg(lcd, "Blocked", f"Wait {LOCKOUT_S}s")
                 beep_long()
                 for _ in range(LOCKOUT_S*2):
                     led_red.toggle(); time.sleep(0.5)
                 led_red.off()
                 beep_long()
                 pokusy = 0
-                lcd_msg(lcd, "Zkus znovu", "")
+                lcd_msg(lcd, "Try again", "")
 
 if __name__ == "__main__":
     try:
