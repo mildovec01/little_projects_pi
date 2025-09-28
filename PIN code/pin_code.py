@@ -125,7 +125,7 @@ led_red   = LED(20)
 buzzer    = Buzzer(12)   # active buzzer (passive buzzer needs PWM)
 
 # ATM logic
-PIN_KOD = "1234"
+PIN_KOD = "4218"
 PIN_MAX_LEN = 6
 MAX_POKUSU = 3
 LOCKOUT_S = 10
